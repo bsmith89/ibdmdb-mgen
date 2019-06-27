@@ -62,3 +62,27 @@ rule query_db:
         """
         sqlite3 -header -separator '\t' {input.db} < {input.query} > {output}
         """
+
+rule download_ibdmdb_metadata:
+    output: 'raw/metadata/hmp2_metadata_2018-08-20.csv'
+    params:
+        url='ftp://ftp.broadinstitute.org/metadata/hmp2_metadata_2018-08-20.csv',
+        user='public',
+        password='hmp2_ftp',
+    shell:
+        'curl --user {params.user}:{params.password} {params.url} > {output}'
+
+rule extract_metadata_tables:
+    output:
+        subject='meta/subject.tsv',
+        visit='meta/visit.tsv',
+        stool='meta/stool.tsv',
+        preparation='meta/preparation.tsv',
+        library='meta/library.tsv',
+    input:
+        script='scripts/process_metadata_tables.py',
+        raw='raw/metadata/hmp2_metadata_2018-08-20.csv',
+    shell:
+        """
+        cat {input.raw} | {input.script} {output.subject} {output.visit} {output.stool} {output.preparation} {output.library}
+        """
