@@ -77,6 +77,8 @@ rule download_ibdmdb_metadata:
         url='ftp://ftp.broadinstitute.org/metadata/hmp2_metadata_2018-08-20.csv',
         user='public',
         password='hmp2_ftp',
+    resources:
+        network_connections=1
     shell:
         'curl --user {params.user}:{params.password} {params.url} > {output}'
 
