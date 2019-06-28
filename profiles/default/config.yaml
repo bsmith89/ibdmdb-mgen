@@ -1,4 +1,3 @@
-notemp: true
 printshellcmds: true
 keep-going: true
 resources: 'network_connections=5'
