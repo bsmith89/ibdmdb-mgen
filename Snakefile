@@ -1,6 +1,7 @@
 # {{{1 Preamble
 
-# import pandas as pd
+import pandas as pd
+import os
 # import math
 # from lib.snake import curl_recipe, alias_recipe
 
@@ -27,6 +28,13 @@ if 'MAX_THREADS' in config:
 # {{{2 Include sub-pipelines
 
 include: 'snake/local.snake'
+
+# {{{2 Metadata config
+
+configfile: 'config.yaml'
+
+if os.path.exists(config['_library']):
+    config['library'] = pd.read_csv(config['_library'], sep='\t', index_col='library_id')
 
 # {{{2 Configure default actions
 
@@ -85,4 +93,29 @@ rule extract_metadata_tables:
     shell:
         """
         cat {input.raw} | {input.script} {output.subject} {output.visit} {output.stool} {output.preparation} {output.library}
+        """
+
+rule download_mgen_from_ibdmdb:
+    output: temp('raw/2018-05-04-mgen/{stem}.tar')
+    params:
+        url='ftp.broadinstitute.org/raw/HMP2/MGX/2018-05-04',
+        username='public',
+        password='hmp2_ftp',
+    resources:
+        network_connections=1,
+    log: 'log/{stem}.wget.log'
+    shell:
+        """
+        wget --no-verbose -o {log} -P raw/2018-05-04-mgen ftp://{params.username}:{params.password}@{params.url}/{wildcards.stem}.tar
+        """
+
+rule unpack_mgen_from_ibdmdb:
+    output:
+        r1='raw/2018-05-04-mgen/{stem}_R1.fastq.gz',
+        r2='raw/2018-05-04-mgen/{stem}_R2.fastq.gz',
+    input:
+        tar='raw/2018-05-04-mgen/{stem}.tar'
+    shell:
+        """
+        tar -C raw/2018-05-04-mgen/ -xf {input.tar}
         """
