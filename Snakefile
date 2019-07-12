@@ -46,20 +46,21 @@ if os.path.exists(config['_meta_db']):  # USUALLY data/meta.db
     _library_group = pd.read_sql('SELECT * FROM library_group;', con=meta_db_conn)
     for library_group, d in _library_group.groupby('library_group'):
         config['library_group'][library_group] = {}
-        config['library_group'][library_group]['libraries'] = d.library_id.to_list()
+        config['library_group'][library_group]['all_libraries'] = d.library_id.to_list()
 
-    config['subject'] = {}
     d0 = pd.read_sql(('SELECT * FROM mgen_library '
                       'JOIN preparation USING (preparation_id) '
                       'JOIN stool USING (stool_id) '
                       'JOIN visit USING (visit_id) '
                       'JOIN library_group USING (library_id);'),
                      con=meta_db_conn)
-    for subject_id, d1 in d0.groupby('subject_id'):
-        config['subject'][subject_id] = {}
-        config['subject'][subject_id]['mgen_libraries'] = {}
-        for library_group, d2 in d1.groupby('library_group'):
-            config['subject'][subject_id]['mgen_libraries'][library_group] = d2.library_id.to_list()
+    for library_group, d1 in d0.groupby('library_group'):
+        # config['library_group'][library_group] = {}  # Already done above.
+        config['library_group'][library_group]['subject'] = {}
+        for subject_id, d2 in d1.groupby('subject_id'):
+            config['library_group'][library_group]['subject'][subject_id] = d2.library_id.to_list()
+
+    config['all_subjects'] = d0.subject_id.unique()
 
 def library_to_external_id(library_id):
     return config['library'].loc[library_id].external_id
@@ -431,9 +432,9 @@ rule co_assemble_mgen_by_subject:
         dir=directory('data/{group}.{subject}.sa.megahit.d')
     input:
         r1=lambda w: [f'data/{library}.m.proc.r1.fq.gz'
-                      for library in config['subject'][w.subject]['mgen_libraries'][w.group]],
+                      for library in config['library_group'][w.group]['subject'][w.subject]],
         r2=lambda w: [f'data/{library}.m.proc.r2.fq.gz'
-                      for library in config['subject'][w.subject]['mgen_libraries'][w.group]],
+                      for library in config['library_group'][w.group]['subject'][w.subject]],
     params:
         r1_list=lambda w, input: ','.join(input.r1),
         r2_list=lambda w, input: ','.join(input.r2),
@@ -463,9 +464,9 @@ rule co_assemble_mgen_by_group:
         dir=directory('data/{group}.aa.megahit.d')
     input:
         r1=lambda w: [f'data/{library}.m.proc.r1.fq.gz'
-                      for library in config['library_group'][w.group]['mgen_libraries']],
+                      for library in config['library_group'][w.group]['all_libraries']],
         r2=lambda w: [f'data/{library}.m.proc.r2.fq.gz'
-                      for library in config['library_group'][w.group]['mgen_libraries']],
+                      for library in config['library_group'][w.group]['all_libraries']],
     params:
         r1_list=lambda w, input: ','.join(input.r1),
         r2_list=lambda w, input: ','.join(input.r2),
@@ -490,13 +491,13 @@ rule co_assemble_mgen_by_group:
 rule assemble_all_by_subject:
     output: touch('data/{group}.sa.touch')
     input:
-        lambda w: [f'data/{{group}}.{subject}.sa.fn' for subject in config['subject']]
+        lambda w: [f'data/{{group}}.{subject}.sa.fn' for subject in config['library_group'][w.group]['subject']]
 
 # 'ma' for 'merged assembly'
 rule merge_subject_assemblies:
     output: merged_asmbl=directory('data/{group}.ma.d')
     input:
-        subject_asmbl=lambda w: [f'data/{{group}}.{subject}.sa.fasta' for subject in config['subject']]
+        subject_asmbl=lambda w: [f'data/{{group}}.{subject}.sa.fasta' for subject in config['library_group'][w.group]['subject']]
     params:
         input_args=lambda w, input: ' '.join(f'--trusted-contigs {contigs}' for contigs in input.subject_asmbl)
     threads: MAX_THREADS
@@ -539,4 +540,4 @@ rule iggsearch_all_from_subject:
     output: touch('data/{group}.{subject}.iggsearch.touch')
     input:
         dir=lambda w: [f'data/{library}.m.proc.iggmidas/iggsearch'
-                      for library in config['subject'][w.subject]['mgen_libraries'][w.group]],
+                      for library in config['library_group'][w.group]['subject'][w.subject]],
