@@ -488,10 +488,6 @@ rule co_assemble_mgen_by_group:
         megahit_toolkit contig2fastg {params.k_max} {output.dir}/intermediate_contigs/k{params.k_max}.contigs.fa > {output.fastg}
         '''
 
-rule assemble_all_by_subject:
-    output: touch('data/{group}.sa.touch')
-    input:
-        lambda w: [f'data/{{group}}.{subject}.sa.fn' for subject in config['library_group'][w.group]['subject']]
 
 # 'ma' for 'merged assembly'
 rule merge_subject_assemblies:
