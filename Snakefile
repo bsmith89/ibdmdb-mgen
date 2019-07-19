@@ -488,6 +488,37 @@ rule co_assemble_mgen_by_group:
         megahit_toolkit contig2fastg {params.k_max} {output.dir}/intermediate_contigs/k{params.k_max}.contigs.fa > {output.fastg}
         '''
 
+rule concat_subject_assemblies:
+    output: 'data/{group}.csa.fn'
+    input:
+        lambda w: [f'data/{{group}}.{subject}.sa.fn' for subject in config['library_group'][w.group]['subject']]
+    shell:
+        """
+        cat {input} | paste - - | awk '{i+=1; print ">" i "\n" $2}' > {output}
+        """
+
+rule overlap_assemblies:
+    output: 'data/{group}.csa.paf.gz'
+    input: 'data/{group}.csa.fn'
+    params:
+        map_mode='asm20'
+    threads: MAX_THREADS
+    shell:
+        """
+        minimap2 -c -x {params.map_mode} -t {threads} {input} {input} | gzip > {output}
+        """
+
+# TODO: Choose this or SPADES output.
+rule assemble_overlapped_assemblies:
+    output: 'data/{group}.ma2.gfa'
+    input: overlap='data/{group}.csa.paf.gz', seqs='data/{group}.csa.fn'
+    params:
+        basename='data/{group}.ma2'
+    threads: MAX_THREADS
+    shell:
+        """
+        seqwish --threads={threads} --base={params.basename} --paf-alns={input.overlap} --seqs={input.seqs} --gfa={output}
+        """
 
 # 'ma' for 'merged assembly'
 rule merge_subject_assemblies:
