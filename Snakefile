@@ -526,19 +526,22 @@ rule merge_subject_assemblies:
     input:
         subject_asmbl=lambda w: [f'data/{{group}}.{subject}.sa.fasta' for subject in config['library_group'][w.group]['subject']]
     params:
-        input_args=lambda w, input: ' '.join(f'--trusted-contigs {contigs}' for contigs in input.subject_asmbl)
+        subject_asmbl=lambda w, input: ' '.join(f'--trusted-contigs {contigs}' for contigs in input.subject_asmbl),
+        k_max=101
     threads: MAX_THREADS
+    resources:
+        mem_gb=24
     shell:
         """
         dummy_reads=$(mktemp --suffix=.fasta)
-        echo ">dummy_1" > $dummy
-        echo "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" >> $dummy
-        echo ">dummy_2" >> $dummy
-        echo "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT" >> $dummy
+        echo ">dummy_1" > $dummy_reads
+        echo "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" >> $dummy_reads
+        echo ">dummy_2" >> $dummy_reads
+        echo "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT" >> $dummy_reads
 
-        spades.py {params.input_args} -o {output} \
-                --only-assembler --disable-rr --tmp-dir $TMPDIR \
-                -t {threads} --12 $dummy_reads
+        spades.py {params.subject_asmbl} -o {output} \
+                --only-assembler --disable-rr -k {params.k_max} \
+                --tmp-dir {output} -t {threads} --memory {resources.mem_gb} --12 $dummy_reads
         """
 
 # {{{1 Assembly-Free Analysis
