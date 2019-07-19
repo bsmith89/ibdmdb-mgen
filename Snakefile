@@ -111,7 +111,6 @@ PRAGMA foreign_keys = TRUE;
             | sqlite3 {output}
         """
 
-
 rule initialize_project:
     shell:
         '''
