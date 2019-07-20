@@ -500,7 +500,7 @@ rule concat_subject_assemblies:
         lambda w: [f'data/{{group}}.{subject}.sa.fn' for subject in config['library_group'][w.group]['subject']]
     shell:
         """
-        cat {input} | paste - - | awk '{i+=1; print ">" i "\n" $2}' > {output}
+        cat {input} | paste - - | awk -v OFS='\\n' '{{i+=1; print ">"i,$2}}' > {output}
         """
 
 rule overlap_assemblies:
