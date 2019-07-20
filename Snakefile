@@ -503,37 +503,19 @@ rule concat_subject_assemblies:
         cat {input} | paste - - | awk -v OFS='\\n' '{{i+=1; print ">"i,$2}}' > {output}
         """
 
-rule overlap_assemblies:
-    output: 'data/{group}.csa.paf.gz'
-    input: 'data/{group}.csa.fn'
-    params:
-        map_mode='asm20'
-    threads: MAX_THREADS
-    shell:
-        """
-        minimap2 -c -x {params.map_mode} -t {threads} {input} {input} | gzip > {output}
-        """
-
-# TODO: Choose this or SPADES output.
-rule assemble_overlapped_assemblies:
-    output: 'data/{group}.ma2.gfa'
-    input: overlap='data/{group}.csa.paf.gz', seqs='data/{group}.csa.fn'
-    params:
-        basename='data/{group}.ma2'
-    threads: MAX_THREADS
-    shell:
-        """
-        seqwish --threads={threads} --base={params.basename} --paf-alns={input.overlap} --seqs={input.seqs} --gfa={output}
-        """
-
 # 'ma' for 'merged assembly'
-rule merge_subject_assemblies:
-    output: merged_asmbl=directory('data/{group}.ma.d')
+rule merge_subject_assemblies_spades:
+    output:
+        dir=directory('data/{group}.ma1.d'),
+        gfa='data/{group}.ma1.gfa',
+        fasta='data/{group}.ma1.fn',
     input:
         subject_asmbl=lambda w: [f'data/{{group}}.{subject}.sa.fasta' for subject in config['library_group'][w.group]['subject']]
     params:
         subject_asmbl=lambda w, input: ' '.join(f'--trusted-contigs {contigs}' for contigs in input.subject_asmbl),
-        k_max=101
+        k_max=101,
+        dummy_read_f='A' * 2 * 101,
+        dummy_read_r='T' * 2 * 101,
     threads: MAX_THREADS
     resources:
         mem_gb=24
@@ -541,14 +523,37 @@ rule merge_subject_assemblies:
         """
         dummy_reads=$(mktemp --suffix=.fasta)
         echo ">dummy_1" > $dummy_reads
-        echo "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" >> $dummy_reads
+        echo "{params.dummy_read_f}" >> $dummy_reads
         echo ">dummy_2" >> $dummy_reads
-        echo "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT" >> $dummy_reads
+        echo "{params.dummy_read_r}" >> $dummy_reads
 
         spades.py {params.subject_asmbl} -o {output} \
                 --only-assembler --disable-rr -k {params.k_max} \
-                --tmp-dir {output} -t {threads} --memory {resources.mem_gb} --12 $dummy_reads
+                --tmp-dir {output.dir} -t {threads} --memory {resources.mem_gb} --12 $dummy_reads
+        ln {output.dir}/assembly_graph_with_scaffolds.gfa {output.gfa}
+        sed 's:^>NODE_\([0-9]\+\)_length_.*$:>\1:' {output.dir}/contigs.fasta > {output.fasta}
         """
+
+rule merge_subject_assemblies_megahit:
+    output:
+        dir=directory('data/{group}.ma4.d'),
+        fasta='data/{group}.ma4.fn',
+        fastg='data/{group}.ma4.fg'
+    input: 'data/{group}.csa.fn'
+    params:
+        k_max=101,
+    threads: MAX_THREADS
+    shell:
+        """
+        megahit --k-list={params.k_max} \
+                --min-count=1 --no-local --prune-depth=1 --prune-level=0 --low-local-ratio=0.0001 \
+                --no-mercy --kmin-1pass \
+                -t {threads} --tmp-dir $TMPDIR --verbose \
+                -r {input} -o {output.dir}
+        sed 's:k{params.k_max}_\(\S\+\).*$:\1:' {output.dir}/final.contigs.fa > {output.fasta}
+        megahit_toolkit contig2fastg {params.k_max} {output.dir}/intermediate_contigs/k{params.k_max}.contigs.fa > {output.fastg}
+        """
+
 
 # {{{1 Assembly-Free Analysis
 
