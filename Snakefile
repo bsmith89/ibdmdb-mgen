@@ -550,7 +550,7 @@ rule merge_subject_assemblies_spades:
         echo ">dummy_2" >> $dummy_reads
         echo "{params.dummy_read_r}" >> $dummy_reads
 
-        spades.py {params.subject_asmbl} -o {output} \
+        spades.py {params.subject_asmbl} -o {output.dir} \
                 --only-assembler --disable-rr -k {params.k_max} \
                 --tmp-dir {output.dir} -t {threads} --memory {resources.mem_gb} --12 $dummy_reads
         ln {output.dir}/assembly_graph_with_scaffolds.gfa {output.gfa}
