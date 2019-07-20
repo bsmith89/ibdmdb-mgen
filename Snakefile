@@ -503,6 +503,29 @@ rule concat_subject_assemblies:
         cat {input} | paste - - | awk -v OFS='\\n' '{{i+=1; print ">"i,$2}}' > {output}
         """
 
+rule overlap_assemblies:
+    output: 'data/{group}.csa.paf.gz'
+    input: 'data/{group}.csa.fn'
+    params:
+    threads: MAX_THREADS
+    shell:
+        """
+        minimap2 -x sr -D -c -t {threads} {input} {input} | gzip > {output}
+        """
+
+rule merge_subject_assemblies_miniasm:
+    output:
+        gfa='data/{group}.ma3.gfa',
+        fasta='data/{group}.ma3.fn',
+    input: overlap='data/{group}.csa.paf.gz', seqs='data/{group}.csa.fn'
+    params:
+        k_max=101
+    shell:
+        """
+        miniasm -c 1 -s {params.k_max} -2 -f {input.seqs} {input.overlap} -p ug > {output.gfa}
+        awk -v OFS='\\n' '$1=="S"{{i += 1; print ">"i, $3}}' {output.gfa} > {output.fasta}
+        """
+
 # 'ma' for 'merged assembly'
 rule merge_subject_assemblies_spades:
     output:
