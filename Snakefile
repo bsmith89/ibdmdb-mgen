@@ -220,6 +220,11 @@ rule count_seq_lengths_nucl:
         {input.script} {input.seqs} > {output}
         """
 
+rule fastg_to_gfa1:
+    output: 'data/{stem}.gfa'
+    input: 'data/{stem}.fg'
+    shell: "fastg2gfa {input} | sed 's:\<NODE_\([0-9]\+\)_[^\\t]*\>:\\1:g' > {output}"
+
 # {{{1 Downloads
 
 # {{{2 Download and organize reference data
