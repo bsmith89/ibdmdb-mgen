@@ -61,6 +61,8 @@ if os.path.exists(config['_meta_db']):  # USUALLY data/meta.db
             config['library_group'][library_group]['subject'][subject_id] = d2.library_id.to_list()
 
     config['all_subjects'] = d0.subject_id.unique()
+else:
+    print(f"Metadata db does not yet exist.  Please run `snakemake {config[_meta_db]}`.")
 
 def library_to_external_id(library_id):
     return config['library'].loc[library_id].external_id
